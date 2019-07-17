@@ -21,18 +21,57 @@ bool GetPixelOnTexture(const uint8_t *bitmap,uint8_t x, uint8_t y){
     return false;
 }
 
-void Mode7::Draw(){
-  for(uint8_t x = 0; x < 128; x++)
-    for(uint8_t y = 0; y < 8; y++)
-    {
-      uint8_t BufferByte = 0;
-      for(uint8_t i = (y * 8); i < (y * 8)+8; i++){
-        bool PixelValue = GetPixelOnTexture(Bitmap,x,y+i);
-        if(PixelValue){
-          BufferByte |= 1;
-        }
-        BufferByte = BufferByte << 1;
-      }
-      Arduboy2Base::sBuffer[(x * 8) + (y)] = BufferByte;
-    }
+inline uint8_t GetPixel(const uint8_t * bitmap, uint8_t x, uint8_t y, uint8_t width)
+{
+	const uint8_t row = (y / 8);
+	const uint8_t bitShift = (y % 8);
+	const uint8_t bitMask = (1 << bitShift);
+	const uint8_t byteValue = pgm_read_byte(&bitmap[2 + (row * width) + x]);
+
+	return static_cast<uint8_t>((byteValue & bitMask) >> bitShift);
+}
+
+inline uint8_t GetPixel(const uint8_t * bitmap, uint8_t x, uint8_t y)
+{
+	const uint8_t width = pgm_read_byte(&bitmap[0]);
+
+	return GetPixel(bitmap, x, y, width);
+}
+
+inline uint8_t GetPixelWrapped(const uint8_t * bitmap, uint8_t x, uint8_t y)
+{
+	const uint8_t width = pgm_read_byte(&bitmap[0]);
+	const uint8_t height = pgm_read_byte(&bitmap[1]);
+	
+	const uint8_t wrappedX = (x % width);
+	const uint8_t wrappedY = (y % height);
+	
+	return GetPixel(bitmap, wrappedX, wrappedY, width);
+}
+
+void Mode7::Draw()
+{	
+	constexpr uint8_t bufferWidth = WIDTH;
+	constexpr uint8_t bufferHeight = (HEIGHT / 8);
+
+	for(uint8_t x = 0; x < bufferWidth; ++x)
+	{
+		for(uint8_t y = 0; y < bufferHeight; ++y)
+		{
+			const uint8_t row = (y * 8);
+		
+			uint8_t BufferByte = 0;
+			
+			for(uint8_t i = 0; i < 8; ++i)
+			{
+				BufferByte <<= 1;
+				
+				uint8_t PixelValue = GetPixelWrapped(this->Bitmap, x, row + i);
+				
+				BufferByte |= PixelValue;
+			}
+			
+			Arduboy2Base::sBuffer[(y * WIDTH) + x] = BufferByte;
+		}
+	}
 }
